@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # The app project lands in M1; until then CI is a green no-op so the
       # pipeline is verified end-to-end before any code exists.
