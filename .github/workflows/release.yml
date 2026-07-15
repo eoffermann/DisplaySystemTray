@@ -34,4 +34,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
-        run: gh release create $env:TAG (Get-Item DisplaySystemTray-*.zip) --generate-notes --verify-tag
+        run: gh release create $env:TAG (Get-Item DisplaySystemTray-*.zip) publish/DisplaySystemTray.exe --generate-notes --verify-tag
