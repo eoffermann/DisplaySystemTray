@@ -34,7 +34,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
     public TrayApplicationContext(ConfigStore store)
     {
         _store = store;
-        _store.Changed += (_, _) => RebuildMenu();
 
         _menu = new ContextMenuStrip();
         // Reload right before showing so configurations saved by another process
@@ -45,6 +44,16 @@ internal sealed class TrayApplicationContext : ApplicationContext
             RebuildMenu();
         };
         RebuildMenu();
+
+        // Skip rebuilding while the menu is showing: clearing an open menu's items
+        // from under it is a reentrancy hazard, and Opening rebuilds anyway.
+        _store.Changed += (_, _) =>
+        {
+            if (!_menu.Visible)
+            {
+                RebuildMenu();
+            }
+        };
 
         _trayIcon = new NotifyIcon
         {
@@ -84,6 +93,12 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private void RebuildMenu()
     {
+        // ToolStripItems are IDisposable and each holds a static
+        // SystemEvents.UserPreferenceChanged subscription; in a long-running tray
+        // process, clearing without disposing leaks one item set per menu open.
+        var oldItems = new ToolStripItem[_menu.Items.Count];
+        _menu.Items.CopyTo(oldItems, 0);
+
         _menu.Items.Clear();
         _menu.Items.Add(new ToolStripMenuItem("Extend", null, (_, _) => ApplyMode(DisplayMode.Extend)));
         _menu.Items.Add(new ToolStripMenuItem("Show only on 1", null, (_, _) => ApplyMode(DisplayMode.Internal)));
@@ -113,6 +128,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _menu.Items.Add(new ToolStripMenuItem("Settings…", null, (_, _) => OpenSettings()));
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add(new ToolStripMenuItem("Exit", null, (_, _) => ExitApplication()));
+
+        foreach (ToolStripItem item in oldItems)
+        {
+            item.Dispose();
+        }
     }
 
     private SettingsForm? _settingsForm;
