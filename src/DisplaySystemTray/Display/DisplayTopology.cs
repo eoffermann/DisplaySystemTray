@@ -34,32 +34,7 @@ internal static class DisplayTopology
     /// <summary>Reads which topology is currently active. Returns null if Windows reports none.</summary>
     public static DisplayMode? GetCurrent()
     {
-        TopologyId topology;
-        for (int attempt = 0; ; attempt++)
-        {
-            int result = GetDisplayConfigBufferSizes(QdcDatabaseCurrent, out uint numPaths, out uint numModes);
-            if (result != ErrorSuccess)
-            {
-                throw new Win32Exception(result, $"GetDisplayConfigBufferSizes failed (error {result}).");
-            }
-
-            var paths = new PathInfo[numPaths];
-            var modes = new ModeInfo[numModes];
-            result = QueryDisplayConfig(QdcDatabaseCurrent, ref numPaths, paths, ref numModes, modes, out topology);
-
-            if (result == ErrorInsufficientBuffer && attempt < 3)
-            {
-                // A display was (un)plugged between sizing and querying; transient.
-                continue;
-            }
-
-            if (result != ErrorSuccess)
-            {
-                throw new Win32Exception(result, $"QueryDisplayConfig failed (error {result}).");
-            }
-
-            break;
-        }
+        (_, _, TopologyId topology) = QueryDisplayPaths(QdcDatabaseCurrent);
 
         return topology switch
         {

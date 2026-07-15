@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 
 namespace DisplaySystemTray.Display;
@@ -234,4 +235,58 @@ internal static class DisplayApi
 
     [DllImport("user32.dll")]
     public static extern int DisplayConfigGetDeviceInfo(ref TargetDeviceName deviceName);
+
+    /// <summary>
+    /// Builds a GetTargetName request with the header correctly sized for this
+    /// struct - marshaled-size knowledge stays next to the layout it describes.
+    /// </summary>
+    public static TargetDeviceName CreateTargetNameRequest(Luid adapterId, uint targetId) => new()
+    {
+        Header = new DeviceInfoHeader
+        {
+            Type = DeviceInfoType.GetTargetName,
+            Size = (uint)Marshal.SizeOf<TargetDeviceName>(),
+            AdapterId = adapterId,
+            Id = targetId,
+        },
+    };
+
+    /// <summary>
+    /// GetDisplayConfigBufferSizes + QueryDisplayConfig with the documented
+    /// ERROR_INSUFFICIENT_BUFFER retry (the display set can change between the
+    /// two calls). Arrays are trimmed to the counts actually returned. The
+    /// returned topology is only meaningful when flags include QdcDatabaseCurrent.
+    /// </summary>
+    public static (PathInfo[] Paths, ModeInfo[] Modes, TopologyId Topology) QueryDisplayPaths(uint flags)
+    {
+        for (int attempt = 0; ; attempt++)
+        {
+            int result = GetDisplayConfigBufferSizes(flags, out uint numPaths, out uint numModes);
+            if (result != ErrorSuccess)
+            {
+                throw new Win32Exception(result, $"GetDisplayConfigBufferSizes failed (error {result}).");
+            }
+
+            var paths = new PathInfo[numPaths];
+            var modes = new ModeInfo[numModes];
+            TopologyId topology = default;
+            result = (flags & QdcDatabaseCurrent) != 0
+                ? QueryDisplayConfig(flags, ref numPaths, paths, ref numModes, modes, out topology)
+                : QueryDisplayConfig(flags, ref numPaths, paths, ref numModes, modes, IntPtr.Zero);
+
+            if (result == ErrorInsufficientBuffer && attempt < 3)
+            {
+                continue; // a display was (un)plugged between sizing and querying
+            }
+
+            if (result != ErrorSuccess)
+            {
+                throw new Win32Exception(result, $"QueryDisplayConfig failed (error {result}).");
+            }
+
+            Array.Resize(ref paths, (int)numPaths);
+            Array.Resize(ref modes, (int)numModes);
+            return (paths, modes, topology);
+        }
+    }
 }

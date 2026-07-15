@@ -15,7 +15,7 @@ internal static class DisplayConfigSnapshot
     /// <summary>Captures the currently active display configuration.</summary>
     public static SavedConfiguration Capture(string name)
     {
-        (PathInfo[] paths, ModeInfo[] modes) = QueryPaths(QdcOnlyActivePaths);
+        (PathInfo[] paths, ModeInfo[] modes, _) = QueryDisplayPaths(QdcOnlyActivePaths);
 
         var saved = new SavedConfiguration
         {
@@ -85,7 +85,7 @@ internal static class DisplayConfigSnapshot
     /// </summary>
     private static Dictionary<(uint Low, int High), Luid> BuildLuidRemap(SavedConfiguration saved)
     {
-        (PathInfo[] currentPaths, _) = QueryPaths(QdcAllPaths);
+        (PathInfo[] currentPaths, _, _) = QueryDisplayPaths(QdcAllPaths);
 
         // Current device path -> current adapter LUID (first match wins; a
         // monitor appears once per source it could attach to, all same adapter).
@@ -126,56 +126,10 @@ internal static class DisplayConfigSnapshot
         return map;
     }
 
-    /// <summary>
-    /// QueryDisplayConfig with the buffer-size retry loop: the display set can
-    /// change between sizing and querying, which surfaces as
-    /// ERROR_INSUFFICIENT_BUFFER and warrants a fresh attempt.
-    /// </summary>
-    private static (PathInfo[] Paths, ModeInfo[] Modes) QueryPaths(uint flags)
-    {
-        for (int attempt = 0; ; attempt++)
-        {
-            int result = GetDisplayConfigBufferSizes(flags, out uint numPaths, out uint numModes);
-            if (result != ErrorSuccess)
-            {
-                throw new Win32Exception(result, $"GetDisplayConfigBufferSizes failed (error {result}).");
-            }
-
-            var paths = new PathInfo[numPaths];
-            var modes = new ModeInfo[numModes];
-            result = QueryDisplayConfig(flags, ref numPaths, paths, ref numModes, modes, IntPtr.Zero);
-
-            if (result == ErrorInsufficientBuffer && attempt < 3)
-            {
-                continue; // displays changed between the two calls; retry
-            }
-
-            if (result != ErrorSuccess)
-            {
-                throw new Win32Exception(result, $"QueryDisplayConfig failed (error {result}).");
-            }
-
-            // The API may return fewer elements than it sized for; trim.
-            Array.Resize(ref paths, (int)numPaths);
-            Array.Resize(ref modes, (int)numModes);
-            return (paths, modes);
-        }
-    }
-
     /// <summary>Friendly name and device path for a target, or empty strings on failure.</summary>
-    public static (string FriendlyName, string DevicePath) GetTargetNames(Luid adapterId, uint targetId)
+    private static (string FriendlyName, string DevicePath) GetTargetNames(Luid adapterId, uint targetId)
     {
-        var request = new TargetDeviceName
-        {
-            Header = new DeviceInfoHeader
-            {
-                Type = DeviceInfoType.GetTargetName,
-                Size = (uint)System.Runtime.InteropServices.Marshal.SizeOf<TargetDeviceName>(),
-                AdapterId = adapterId,
-                Id = targetId,
-            },
-        };
-
+        TargetDeviceName request = CreateTargetNameRequest(adapterId, targetId);
         return DisplayConfigGetDeviceInfo(ref request) == ErrorSuccess
             ? (request.MonitorFriendlyDeviceName, request.MonitorDevicePath)
             : (string.Empty, string.Empty);
