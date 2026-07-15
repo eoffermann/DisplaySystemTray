@@ -16,6 +16,10 @@ internal sealed class ConfigStore
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(5);
 
+    // Best-effort reads run on the UI thread (menu Opening); they must never
+    // stall the shell behind a slow lock holder.
+    private static readonly TimeSpan ReadLockTimeout = TimeSpan.FromMilliseconds(250);
+
     // Per-user-SID name, like the single-instance mutex (#3): a fixed shared name
     // would let any same-session process squat the lock.
     private static readonly string LockName = BuildLockName();
@@ -28,6 +32,7 @@ internal sealed class ConfigStore
     }
 
     private readonly string _filePath;
+    private DateTime _lastSeenWriteTimeUtc;
 
     public AppConfig Config { get; private set; }
 
@@ -42,7 +47,11 @@ internal sealed class ConfigStore
         _filePath = filePath;
         Config = config;
         LoadWarning = loadWarning;
+        _lastSeenWriteTimeUtc = GetWriteTimeUtc();
     }
+
+    private DateTime GetWriteTimeUtc() =>
+        File.Exists(_filePath) ? File.GetLastWriteTimeUtc(_filePath) : default;
 
     public static string DefaultPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
@@ -92,11 +101,19 @@ internal sealed class ConfigStore
     {
         try
         {
+            // Timestamp short-circuit: don't touch the lock at all on the common
+            // nothing-changed path (this runs on every tray-menu open).
+            if (GetWriteTimeUtc() == _lastSeenWriteTimeUtc)
+            {
+                return;
+            }
+
             WithFileLock(bestEffort: true, action: () =>
             {
                 if (File.Exists(_filePath))
                 {
                     Config = ReadConfigNoLock(_filePath);
+                    _lastSeenWriteTimeUtc = GetWriteTimeUtc();
                 }
 
                 return true;
@@ -150,6 +167,7 @@ internal sealed class ConfigStore
 
             mutation(Config);
             PersistNoLock();
+            _lastSeenWriteTimeUtc = GetWriteTimeUtc();
             return true;
         });
 
@@ -220,7 +238,7 @@ internal sealed class ConfigStore
                 mutex = new Mutex(initiallyOwned: false, LockName);
                 try
                 {
-                    owned = mutex.WaitOne(LockTimeout);
+                    owned = mutex.WaitOne(bestEffort ? ReadLockTimeout : LockTimeout);
                 }
                 catch (AbandonedMutexException)
                 {
