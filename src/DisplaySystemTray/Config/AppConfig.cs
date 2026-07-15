@@ -7,6 +7,54 @@ internal sealed class AppConfig
     public int SchemaVersion { get; set; } = 1;
 
     public List<SavedConfiguration> Configurations { get; set; } = [];
+
+    /// <summary>
+    /// Repairs nulls a hand-edited (or hostile) config.json can inject: JSON
+    /// null assigns straight through the non-nullable annotations during
+    /// deserialization without throwing, so it would otherwise NRE far from the
+    /// load site (e.g. while building the tray menu, crashing every launch).
+    /// </summary>
+    public void Normalize()
+    {
+        if (Configurations is null)
+        {
+            Configurations = [];
+            return;
+        }
+
+        Configurations.RemoveAll(c => c is null);
+        foreach (SavedConfiguration saved in Configurations)
+        {
+            saved.Name ??= string.Empty;
+
+            if (saved.MonitorNames is null)
+            {
+                saved.MonitorNames = [];
+            }
+            else
+            {
+                saved.MonitorNames.RemoveAll(n => n is null);
+            }
+
+            if (saved.Paths is null)
+            {
+                saved.Paths = [];
+            }
+            else
+            {
+                saved.Paths.RemoveAll(p => p is null);
+            }
+
+            if (saved.Modes is null)
+            {
+                saved.Modes = [];
+            }
+            else
+            {
+                saved.Modes.RemoveAll(m => m is null);
+            }
+        }
+    }
 }
 
 /// <summary>

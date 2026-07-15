@@ -50,6 +50,7 @@ internal sealed class ConfigStore
                 throw new JsonException("Config deserialized to null.");
             }
 
+            config.Normalize();
             return new ConfigStore(filePath, config, loadWarning: null);
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
@@ -86,6 +87,7 @@ internal sealed class ConfigStore
             var config = JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(_filePath), JsonOptions);
             if (config is not null)
             {
+                config.Normalize();
                 Config = config;
             }
         }
