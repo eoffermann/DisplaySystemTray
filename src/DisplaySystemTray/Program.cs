@@ -12,6 +12,10 @@ internal static class Program
             return Cli.Run(args);
         }
 
+        // DPI awareness and visual styles must be configured before ANY UI is
+        // shown, including the "already running" dialog below.
+        ApplicationConfiguration.Initialize();
+
         using var singleInstance = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out bool createdNew);
         if (!createdNew)
         {
@@ -22,8 +26,6 @@ internal static class Program
                 MessageBoxIcon.Information);
             return 0;
         }
-
-        ApplicationConfiguration.Initialize();
 
         // A tray app has no console; without these handlers an exception would
         // silently kill the process and the icon would just vanish.
