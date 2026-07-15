@@ -10,10 +10,27 @@ internal static class StartupRegistration
 {
     private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
+    // Quoted so a path with spaces cannot be misparsed (or hijacked) at logon.
+    private static string RegistrationValue =>
+        $"\"{Environment.ProcessPath ?? Application.ExecutablePath}\"";
+
     public static bool IsEnabled()
     {
-        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(RunKeyPath);
-        return key?.GetValue(Program.AppName) is string;
+        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
+        if (key?.GetValue(Program.AppName) is not string registered)
+        {
+            return false;
+        }
+
+        // Self-heal: this is an "unzip anywhere" app, so a moved exe would leave
+        // a stale path that silently fails at logon while the checkbox still
+        // reads enabled. Re-point the value at the running executable.
+        if (!string.Equals(registered, RegistrationValue, StringComparison.OrdinalIgnoreCase))
+        {
+            key.SetValue(Program.AppName, RegistrationValue);
+        }
+
+        return true;
     }
 
     public static void SetEnabled(bool enabled)
@@ -21,9 +38,7 @@ internal static class StartupRegistration
         using RegistryKey key = Registry.CurrentUser.CreateSubKey(RunKeyPath, writable: true);
         if (enabled)
         {
-            // Quote the exact path so a path with spaces cannot be misparsed
-            // (or hijacked) at logon.
-            key.SetValue(Program.AppName, $"\"{Application.ExecutablePath}\"");
+            key.SetValue(Program.AppName, RegistrationValue);
         }
         else
         {

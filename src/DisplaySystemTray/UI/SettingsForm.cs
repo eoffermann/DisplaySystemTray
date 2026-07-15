@@ -65,7 +65,8 @@ internal sealed class SettingsForm : Form
         var bottom = new Panel { Dock = DockStyle.Bottom, Height = 36 };
         bottom.Controls.Add(startupCheck);
 
-        bool suppressStartupEvent = true;
+        // The handler is attached after this initial read, so no suppression is
+        // needed here; the flag below only guards the revert inside the handler.
         try
         {
             startupCheck.Checked = StartupRegistration.IsEnabled();
@@ -76,7 +77,7 @@ internal sealed class SettingsForm : Form
             startupCheck.Text = "Start with Windows (unavailable)";
         }
 
-        suppressStartupEvent = false;
+        bool suppressStartupEvent = false;
         startupCheck.CheckedChanged += (_, _) =>
         {
             if (suppressStartupEvent)
