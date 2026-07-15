@@ -42,17 +42,17 @@ internal static class Program
             // The dialog below blocks teardown; if the single-instance mutex stayed
             // held during that window, a relaunch would report "already running"
             // while no icon exists. Closing the handle abandons the mutex, which
-            // acquisition treats as successful ownership.
+            // acquisition treats as successful ownership. Interlocked.Exchange
+            // keeps this from racing the normal exit path in Main.
             try
             {
-                _singleInstance?.Dispose();
+                Interlocked.Exchange(ref _singleInstance, null)?.Dispose();
             }
             catch (Exception)
             {
                 // Process is dying; nothing useful to do.
             }
 
-            _singleInstance = null;
             ShowUnhandledErrorDialog(e.ExceptionObject, fatal: e.IsTerminating);
         };
 
@@ -64,7 +64,9 @@ internal static class Program
 
             try
             {
-                _singleInstance.ReleaseMutex();
+                // Snapshot the field: the fatal-exit handler may null it from a
+                // background thread while the dialog blocks teardown.
+                _singleInstance?.ReleaseMutex();
             }
             catch (Exception ex) when (ex is ApplicationException or ObjectDisposedException)
             {
@@ -76,8 +78,7 @@ internal static class Program
         }
         finally
         {
-            _singleInstance?.Dispose();
-            _singleInstance = null;
+            Interlocked.Exchange(ref _singleInstance, null)?.Dispose();
         }
     }
 
