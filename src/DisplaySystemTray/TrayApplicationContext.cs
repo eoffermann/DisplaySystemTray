@@ -1,6 +1,7 @@
 using System.Reflection;
 using DisplaySystemTray.Config;
 using DisplaySystemTray.Display;
+using DisplaySystemTray.UI;
 
 namespace DisplaySystemTray;
 
@@ -88,9 +89,29 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
 
         _menu.Items.Add(new ToolStripSeparator());
-        _menu.Items.Add(new ToolStripMenuItem("Settings…", null, (_, _) => NotYetImplemented("Settings")));
+        _menu.Items.Add(new ToolStripMenuItem("Settings…", null, (_, _) => OpenSettings()));
         _menu.Items.Add(new ToolStripSeparator());
         _menu.Items.Add(new ToolStripMenuItem("Exit", null, (_, _) => ExitApplication()));
+    }
+
+    private SettingsForm? _settingsForm;
+
+    private void OpenSettings()
+    {
+        if (_settingsForm is { IsDisposed: false })
+        {
+            if (_settingsForm.WindowState == FormWindowState.Minimized)
+            {
+                _settingsForm.WindowState = FormWindowState.Normal;
+            }
+
+            _settingsForm.Activate();
+            return;
+        }
+
+        _settingsForm = new SettingsForm(_store);
+        _settingsForm.FormClosed += (_, _) => _settingsForm = null;
+        _settingsForm.Show();
     }
 
     private void ApplySaved(SavedConfiguration saved)
@@ -143,11 +164,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
             // First arg (timeout) has been ignored by Windows since Vista; pass 0.
             _trayIcon.ShowBalloonTip(0, Program.AppName, $"Could not switch displays: {ex.Message}", ToolTipIcon.Error);
         }
-    }
-
-    private void NotYetImplemented(string feature)
-    {
-        _trayIcon.ShowBalloonTip(0, Program.AppName, $"{feature} is not implemented yet.", ToolTipIcon.Info);
     }
 
     /// <summary>

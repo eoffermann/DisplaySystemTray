@@ -34,6 +34,13 @@ internal static class Cli
                 case "--selftest":
                     return SelfTest();
 
+                case "--settings":
+                    // Open just the settings window, without the tray icon. Doubles
+                    // as the scripted verification path for the M4 UI.
+                    ApplicationConfiguration.Initialize();
+                    Application.Run(new UI.SettingsForm(ConfigStore.Load()));
+                    return 0;
+
                 case "--list":
                     return ListSaved();
 
