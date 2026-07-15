@@ -18,8 +18,8 @@ internal static class Program
         // shown, including the "already running" dialog below.
         ApplicationConfiguration.Initialize();
 
-        using Mutex? singleInstance = TryAcquireSingleInstance();
-        if (singleInstance is null)
+        _singleInstance = TryAcquireSingleInstance();
+        if (_singleInstance is null)
         {
             MessageBox.Show(
                 $"{AppName} is already running. Look for its icon in the system tray.",
@@ -38,24 +38,47 @@ internal static class Program
             // The CLR is tearing the process down: Main's using blocks never run,
             // so remove the tray icon now or it ghosts until the user mouses over it.
             _trayContext?.PrepareForFatalExit();
+
+            // The dialog below blocks teardown; if the single-instance mutex stayed
+            // held during that window, a relaunch would report "already running"
+            // while no icon exists. Closing the handle abandons the mutex, which
+            // acquisition treats as successful ownership.
+            try
+            {
+                _singleInstance?.Dispose();
+            }
+            catch (Exception)
+            {
+                // Process is dying; nothing useful to do.
+            }
+
+            _singleInstance = null;
             ShowUnhandledErrorDialog(e.ExceptionObject, fatal: e.IsTerminating);
         };
 
-        using var context = new TrayApplicationContext(Config.ConfigStore.Load());
-        _trayContext = context;
-        Application.Run(context);
-
         try
         {
-            singleInstance.ReleaseMutex();
-        }
-        catch (ApplicationException)
-        {
-            // Not owned on this thread (e.g. abandoned-mutex acquisition edge); the
-            // handle close below releases it anyway.
-        }
+            using var context = new TrayApplicationContext(Config.ConfigStore.Load());
+            _trayContext = context;
+            Application.Run(context);
 
-        return 0;
+            try
+            {
+                _singleInstance.ReleaseMutex();
+            }
+            catch (Exception ex) when (ex is ApplicationException or ObjectDisposedException)
+            {
+                // Not owned on this thread, or already released by the fatal-exit
+                // path; the handle close below covers it either way.
+            }
+
+            return 0;
+        }
+        finally
+        {
+            _singleInstance?.Dispose();
+            _singleInstance = null;
+        }
     }
 
     /// <summary>
@@ -103,6 +126,7 @@ internal static class Program
     }
 
     private static TrayApplicationContext? _trayContext;
+    private static Mutex? _singleInstance;
 
     /// <summary>
     /// Last-resort error reporting. May run on the faulting (non-UI) thread when
@@ -124,10 +148,15 @@ internal static class Program
             details = details[..maxDialogChars] + "…";
         }
 
+        // On the fatal path this may run on a background thread with no foreground
+        // rights; ServiceNotification makes the dialog appear on the desktop
+        // instead of opening invisibly behind other windows (or not at all).
         MessageBox.Show(
             $"{AppName} hit an unexpected error{(fatal ? " and must close" : string.Empty)}:\n\n{details}",
             AppName,
             MessageBoxButtons.OK,
-            MessageBoxIcon.Error);
+            MessageBoxIcon.Error,
+            MessageBoxDefaultButton.Button1,
+            fatal ? MessageBoxOptions.ServiceNotification : 0);
     }
 }
