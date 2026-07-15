@@ -5,11 +5,12 @@ namespace DisplaySystemTray.Config;
 /// <summary>
 /// Loads and saves the app configuration at %APPDATA%\DisplaySystemTray\config.json.
 /// Writes are atomic (unique temp file + rename) so a crash mid-save cannot corrupt
-/// the file, and every file access is serialized across processes with a named
-/// mutex - the tray app and CLI invocations share this file. Mutations re-read the
-/// file under the lock before applying, so concurrent writers cannot lose each
-/// other's updates. A corrupt file on load is set aside (renamed) and a fresh
-/// config used.
+/// the file. File access is serialized across processes with a named mutex where
+/// possible - mutations require it and re-read the file under the lock before
+/// applying (so concurrent writers cannot lose each other's updates), while reads
+/// and startup degrade to best-effort unlocked access rather than fail. A corrupt
+/// file on load is set aside (renamed) and a fresh config used; an unreadable one
+/// is left in place.
 /// </summary>
 internal sealed class ConfigStore
 {
@@ -20,8 +21,9 @@ internal sealed class ConfigStore
     // stall the shell behind a slow lock holder.
     private static readonly TimeSpan ReadLockTimeout = TimeSpan.FromMilliseconds(250);
 
-    // Per-user-SID name, like the single-instance mutex (#3): a fixed shared name
-    // would let any same-session process squat the lock.
+    // Per-user-SID name for isolation between different users' sessions (e.g.
+    // runas); squatting itself is mitigated by the degrade-to-unlocked path in
+    // WithFileLock, not by the name.
     private static readonly string LockName = BuildLockName();
 
     private static string BuildLockName()
@@ -74,10 +76,10 @@ internal sealed class ConfigStore
             {
                 return new ConfigStore(filePath, ReadConfigNoLock(filePath), loadWarning: null);
             }
-            catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+            catch (JsonException ex)
             {
-                // Never crash-loop on a bad file: set it aside so the user can
-                // inspect it, and start fresh.
+                // Genuinely corrupt content: never crash-loop on it - set it aside
+                // so the user can inspect it, and start fresh.
                 string quarantined = $"{filePath}.corrupt-{DateTimeOffset.Now:yyyyMMdd-HHmmss}";
                 try
                 {
@@ -92,6 +94,18 @@ internal sealed class ConfigStore
                     filePath,
                     new AppConfig(),
                     $"The configuration file could not be read ({ex.Message}). It was set aside as {quarantined} and a fresh configuration was started.");
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Possibly transient (another process mid-write since best-effort
+                // reads may run unlocked, an AV scan, a permission hiccup): the
+                // file may be perfectly healthy, so leave it in place. Mutations
+                // re-read the disk state under the lock before writing, so the
+                // empty in-memory start cannot clobber saved configurations.
+                return new ConfigStore(
+                    filePath,
+                    new AppConfig(),
+                    $"The configuration file could not be read ({ex.Message}). It was left in place; saved configurations will reappear once it is readable.");
             }
         });
     }
@@ -119,9 +133,10 @@ internal sealed class ConfigStore
                 return true;
             });
         }
-        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or TimeoutException)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
-            // Keep the in-memory config; the file may be mid-write or briefly locked.
+            // Keep the in-memory config; the file may be mid-write or briefly
+            // locked. (Best-effort locking never throws TimeoutException.)
         }
     }
 
