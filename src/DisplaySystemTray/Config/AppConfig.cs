@@ -43,6 +43,12 @@ internal sealed class AppConfig
             else
             {
                 saved.Paths.RemoveAll(p => p is null);
+                foreach (PathDto path in saved.Paths)
+                {
+                    // Null device paths would ArgumentNullException in the LUID
+                    // remap dictionary at apply time.
+                    path.TargetDevicePath ??= string.Empty;
+                }
             }
 
             if (saved.Modes is null)
