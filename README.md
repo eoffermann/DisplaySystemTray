@@ -67,4 +67,4 @@ See [PLAN.md](PLAN.md) for design details. Post-MVP ideas include Duplicate/clon
 
 ## License
 
-TBD.
+[MIT](LICENSE).
