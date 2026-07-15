@@ -24,8 +24,9 @@ There is no test project yet; display-API behavior is verified via the hidden CL
 - `src/DisplaySystemTray/Cli.cs` — hidden command-line verbs (`--current`, `--validate`, `--apply`, `--selftest`, `--list`, `--save`, `--restore`, `--delete`) for scripted verification; exit codes 0/1/2/3 documented in its usage text.
 - `src/DisplaySystemTray/TrayApplicationContext.cs` — tray icon + context menu; menu is rebuilt from the config store on change and reloaded on open if another process changed the file.
 - `src/DisplaySystemTray/Display/` — P/Invoke declarations (`DisplayApi.cs`), quick topology switching (`DisplayTopology.cs`), full-config snapshot/restore with adapter-LUID remapping (`DisplayConfigSnapshot.cs`).
-- `src/DisplaySystemTray/Config/` — JSON model (`AppConfig.cs`) + atomic-write store (`ConfigStore.cs`).
-- `src/DisplaySystemTray/UI/SettingsForm.cs` — manage saved configurations (add/rename/update-from-current/delete). *(lands in M4)*
+- `src/DisplaySystemTray/Config/` — JSON model (`AppConfig.cs`), atomic-write cross-process-locked store (`ConfigStore.cs`), HKCU Run-key autostart (`StartupRegistration.cs`).
+- `src/DisplaySystemTray/UI/` — settings window (`SettingsForm.cs`: add/rename/update-from-current/delete + Start-with-Windows checkbox) and the name-entry modal (`TextPromptDialog.cs`).
+- `src/DisplaySystemTray/Resources/app.ico` — generated multi-size two-monitor icon, embedded for the tray and set as the exe icon.
 
 ## Development workflow (mandatory for all agents)
 

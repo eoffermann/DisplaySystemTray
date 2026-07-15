@@ -69,8 +69,8 @@ src/DisplaySystemTray/
 2. ~~**M1 — Project + tray shell**~~ ✅: .NET 8 SDK installed, tray icon with menu, single-instance guard, Exit works.
 3. ~~**M2 — Quick mode switching**~~ ✅: CCD P/Invoke layer, Extend / Show only 1 / Show only 2 working; hidden CLI added for scripted verification.
 4. ~~**M3 — Snapshot & restore**~~ ✅: capture current config, JSON persistence with atomic writes, apply with adapter-LUID remapping; saved items shown in tray menu.
-5. **M4 — Settings window**: CRUD UI (add/rename/update-from-current/delete), menu refresh on change.
-6. **M5 — Polish & ship**: app icon, optional "Start with Windows" checkbox (HKCU Run key), README with usage, `dotnet publish` self-contained exe, tag v0.1.0.
+5. ~~**M4 — Settings window**~~ ✅: CRUD UI (add/rename/update-from-current/delete), menu refresh on change, `--settings` CLI entry.
+6. ~~**M5 — Polish & ship**~~ ✅: app icon, "Start with Windows" checkbox (HKCU Run key), README with usage, `dotnet publish` self-contained exe, tag v0.1.0.
 
 ## Verification
 
