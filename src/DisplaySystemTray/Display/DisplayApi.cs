@@ -10,8 +10,10 @@ namespace DisplaySystemTray.Display;
 internal static class DisplayApi
 {
     public const int ErrorSuccess = 0;
+    public const int ErrorInsufficientBuffer = 122;
 
     // QueryDisplayConfig / GetDisplayConfigBufferSizes flags
+    public const uint QdcAllPaths = 0x00000001;
     public const uint QdcOnlyActivePaths = 0x00000002;
     public const uint QdcDatabaseCurrent = 0x00000004;
 

@@ -1,3 +1,4 @@
+using DisplaySystemTray.Config;
 using DisplaySystemTray.Display;
 
 namespace DisplaySystemTray;
@@ -33,8 +34,21 @@ internal static class Cli
                 case "--selftest":
                     return SelfTest();
 
+                case "--list":
+                    return ListSaved();
+
+                case "--save" when args.Length > 1:
+                    return SaveCurrent(args[1]);
+
+                case "--restore" when args.Length > 1:
+                    return Restore(args[1]);
+
+                case "--delete" when args.Length > 1:
+                    return Delete(args[1]);
+
                 default:
-                    Console.WriteLine("Usage: DisplaySystemTray [--current | --validate <mode> | --apply <mode> | --selftest]");
+                    Console.WriteLine("Usage: DisplaySystemTray [--current | --validate <mode> | --apply <mode> | --selftest");
+                    Console.WriteLine("                         | --list | --save <name> | --restore <name> | --delete <name>]");
                     Console.WriteLine("Modes: extend, internal, external, clone. No arguments starts the tray app.");
                     return 2;
             }
@@ -45,6 +59,66 @@ internal static class Cli
             return 3;
         }
     }
+
+    private static int ListSaved()
+    {
+        var store = ConfigStore.Load();
+        if (store.Config.Configurations.Count == 0)
+        {
+            Console.WriteLine("No saved configurations.");
+            return 0;
+        }
+
+        foreach (SavedConfiguration saved in store.Config.Configurations)
+        {
+            Console.WriteLine($"{saved.Name}  [{string.Join(", ", saved.MonitorNames)}]  saved {saved.CapturedAt:u}  id={saved.Id}");
+        }
+
+        return 0;
+    }
+
+    private static int SaveCurrent(string name)
+    {
+        var store = ConfigStore.Load();
+        SavedConfiguration saved = DisplayConfigSnapshot.Capture(name);
+        store.Add(saved);
+        Console.WriteLine($"Saved \"{name}\": {saved.Paths.Count} path(s), {saved.Modes.Count} mode(s), monitors: {string.Join(", ", saved.MonitorNames)}");
+        return 0;
+    }
+
+    private static int Restore(string name)
+    {
+        var store = ConfigStore.Load();
+        SavedConfiguration? saved = FindByName(store, name);
+        if (saved is null)
+        {
+            Console.WriteLine($"No saved configuration named \"{name}\".");
+            return 1;
+        }
+
+        Console.WriteLine($"Applying \"{saved.Name}\"...");
+        DisplayConfigSnapshot.Apply(saved);
+        Console.WriteLine("Applied.");
+        return 0;
+    }
+
+    private static int Delete(string name)
+    {
+        var store = ConfigStore.Load();
+        SavedConfiguration? saved = FindByName(store, name);
+        if (saved is null)
+        {
+            Console.WriteLine($"No saved configuration named \"{name}\".");
+            return 1;
+        }
+
+        store.Remove(saved.Id);
+        Console.WriteLine($"Deleted \"{saved.Name}\".");
+        return 0;
+    }
+
+    private static SavedConfiguration? FindByName(ConfigStore store, string name) =>
+        store.Config.Configurations.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Exercises the display layer end-to-end with minimal disruption: validates

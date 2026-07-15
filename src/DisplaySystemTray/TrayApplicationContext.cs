@@ -1,4 +1,5 @@
 using System.Reflection;
+using DisplaySystemTray.Config;
 using DisplaySystemTray.Display;
 
 namespace DisplaySystemTray;
@@ -27,10 +28,23 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private readonly NotifyIcon _trayIcon;
     private readonly ContextMenuStrip _menu;
+    private readonly ConfigStore _store;
 
-    public TrayApplicationContext()
+    public TrayApplicationContext(ConfigStore store)
     {
-        _menu = BuildMenu();
+        _store = store;
+        _store.Changed += (_, _) => RebuildMenu();
+
+        _menu = new ContextMenuStrip();
+        // Reload right before showing so configurations saved by another process
+        // (the CLI, or a second session) appear without restarting the tray app.
+        _menu.Opening += (_, _) =>
+        {
+            _store.ReloadIfChangedExternally();
+            RebuildMenu();
+        };
+        RebuildMenu();
+
         _trayIcon = new NotifyIcon
         {
             Icon = SystemIcons.Application, // placeholder until the custom icon lands in M5
@@ -39,19 +53,56 @@ internal sealed class TrayApplicationContext : ApplicationContext
             Visible = true,
         };
         _trayIcon.MouseUp += OnTrayMouseUp;
+
+        if (_store.LoadWarning is { } warning)
+        {
+            _trayIcon.ShowBalloonTip(0, Program.AppName, warning, ToolTipIcon.Warning);
+        }
     }
 
-    private ContextMenuStrip BuildMenu()
+    private void RebuildMenu()
     {
-        var menu = new ContextMenuStrip();
-        menu.Items.Add(new ToolStripMenuItem("Extend", null, (_, _) => ApplyMode(DisplayMode.Extend)));
-        menu.Items.Add(new ToolStripMenuItem("Show only on 1", null, (_, _) => ApplyMode(DisplayMode.Internal)));
-        menu.Items.Add(new ToolStripMenuItem("Show only on 2", null, (_, _) => ApplyMode(DisplayMode.External)));
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("Settings…", null, (_, _) => NotYetImplemented("Settings")));
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("Exit", null, (_, _) => ExitApplication()));
-        return menu;
+        _menu.Items.Clear();
+        _menu.Items.Add(new ToolStripMenuItem("Extend", null, (_, _) => ApplyMode(DisplayMode.Extend)));
+        _menu.Items.Add(new ToolStripMenuItem("Show only on 1", null, (_, _) => ApplyMode(DisplayMode.Internal)));
+        _menu.Items.Add(new ToolStripMenuItem("Show only on 2", null, (_, _) => ApplyMode(DisplayMode.External)));
+        _menu.Items.Add(new ToolStripSeparator());
+
+        if (_store.Config.Configurations.Count == 0)
+        {
+            _menu.Items.Add(new ToolStripMenuItem("(no saved configurations)") { Enabled = false });
+        }
+        else
+        {
+            foreach (SavedConfiguration saved in _store.Config.Configurations)
+            {
+                SavedConfiguration captured = saved;
+                var item = new ToolStripMenuItem(saved.Name, null, (_, _) => ApplySaved(captured))
+                {
+                    ToolTipText = saved.MonitorNames.Count > 0
+                        ? $"{string.Join(", ", saved.MonitorNames)} — saved {saved.CapturedAt:g}"
+                        : $"saved {saved.CapturedAt:g}",
+                };
+                _menu.Items.Add(item);
+            }
+        }
+
+        _menu.Items.Add(new ToolStripSeparator());
+        _menu.Items.Add(new ToolStripMenuItem("Settings…", null, (_, _) => NotYetImplemented("Settings")));
+        _menu.Items.Add(new ToolStripSeparator());
+        _menu.Items.Add(new ToolStripMenuItem("Exit", null, (_, _) => ExitApplication()));
+    }
+
+    private void ApplySaved(SavedConfiguration saved)
+    {
+        try
+        {
+            DisplayConfigSnapshot.Apply(saved);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            _trayIcon.ShowBalloonTip(0, Program.AppName, ex.Message, ToolTipIcon.Error);
+        }
     }
 
     private void OnTrayMouseUp(object? sender, MouseEventArgs e)

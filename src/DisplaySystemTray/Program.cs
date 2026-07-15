@@ -41,7 +41,7 @@ internal static class Program
             ShowUnhandledErrorDialog(e.ExceptionObject, fatal: e.IsTerminating);
         };
 
-        using var context = new TrayApplicationContext();
+        using var context = new TrayApplicationContext(Config.ConfigStore.Load());
         _trayContext = context;
         Application.Run(context);
 
