@@ -1,4 +1,5 @@
 using System.Reflection;
+using DisplaySystemTray.Display;
 
 namespace DisplaySystemTray;
 
@@ -29,9 +30,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private ContextMenuStrip BuildMenu()
     {
         var menu = new ContextMenuStrip();
-        menu.Items.Add(new ToolStripMenuItem("Extend", null, (_, _) => NotYetImplemented("Extend")));
-        menu.Items.Add(new ToolStripMenuItem("Show only on 1", null, (_, _) => NotYetImplemented("Show only on 1")));
-        menu.Items.Add(new ToolStripMenuItem("Show only on 2", null, (_, _) => NotYetImplemented("Show only on 2")));
+        menu.Items.Add(new ToolStripMenuItem("Extend", null, (_, _) => ApplyMode(DisplayMode.Extend)));
+        menu.Items.Add(new ToolStripMenuItem("Show only on 1", null, (_, _) => ApplyMode(DisplayMode.Internal)));
+        menu.Items.Add(new ToolStripMenuItem("Show only on 2", null, (_, _) => ApplyMode(DisplayMode.External)));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("Settings…", null, (_, _) => NotYetImplemented("Settings")));
         menu.Items.Add(new ToolStripSeparator());
@@ -56,6 +57,18 @@ internal sealed class TrayApplicationContext : ApplicationContext
         else
         {
             _menu.Show(Cursor.Position);
+        }
+    }
+
+    private void ApplyMode(DisplayMode mode)
+    {
+        try
+        {
+            DisplayTopology.Apply(mode);
+        }
+        catch (Exception ex)
+        {
+            _trayIcon.ShowBalloonTip(5000, "DisplaySystemTray", $"Could not switch displays: {ex.Message}", ToolTipIcon.Error);
         }
     }
 

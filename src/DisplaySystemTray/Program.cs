@@ -5,8 +5,13 @@ internal static class Program
     private const string SingleInstanceMutexName = "DisplaySystemTray_SingleInstance";
 
     [STAThread]
-    private static void Main()
+    private static int Main(string[] args)
     {
+        if (args.Length > 0)
+        {
+            return Cli.Run(args);
+        }
+
         using var singleInstance = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out bool createdNew);
         if (!createdNew)
         {
@@ -15,7 +20,7 @@ internal static class Program
                 "DisplaySystemTray",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
-            return;
+            return 0;
         }
 
         ApplicationConfiguration.Initialize();
@@ -28,6 +33,7 @@ internal static class Program
 
         using var context = new TrayApplicationContext();
         Application.Run(context);
+        return 0;
     }
 
     private static void ShowFatalError(Exception? ex)
