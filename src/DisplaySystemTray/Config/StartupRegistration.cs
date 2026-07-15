@@ -14,23 +14,18 @@ internal static class StartupRegistration
     private static string RegistrationValue =>
         $"\"{Environment.ProcessPath ?? Application.ExecutablePath}\"";
 
+    /// <summary>
+    /// Pure query: true only when autostart points at THIS executable. A value
+    /// registered to some other path (the exe moved, or this is a stray copy)
+    /// reads as disabled, so the user re-enables explicitly and the write happens
+    /// on that action - never as a silent side effect of opening Settings, which
+    /// would let any transiently-run copy capture logon persistence.
+    /// </summary>
     public static bool IsEnabled()
     {
-        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
-        if (key?.GetValue(Program.AppName) is not string registered)
-        {
-            return false;
-        }
-
-        // Self-heal: this is an "unzip anywhere" app, so a moved exe would leave
-        // a stale path that silently fails at logon while the checkbox still
-        // reads enabled. Re-point the value at the running executable.
-        if (!string.Equals(registered, RegistrationValue, StringComparison.OrdinalIgnoreCase))
-        {
-            key.SetValue(Program.AppName, RegistrationValue);
-        }
-
-        return true;
+        using RegistryKey? key = Registry.CurrentUser.OpenSubKey(RunKeyPath);
+        return key?.GetValue(Program.AppName) is string registered
+            && string.Equals(registered, RegistrationValue, StringComparison.OrdinalIgnoreCase);
     }
 
     public static void SetEnabled(bool enabled)
