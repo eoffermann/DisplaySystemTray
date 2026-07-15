@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The app project lands in M1; until then CI is a green no-op so the
+      # pipeline is verified end-to-end before any code exists.
+      - name: Detect project
+        id: detect
+        shell: pwsh
+        run: |
+          $exists = Test-Path 'src/DisplaySystemTray/DisplaySystemTray.csproj'
+          "exists=$($exists.ToString().ToLower())" >> $env:GITHUB_OUTPUT
+          if (-not $exists) { Write-Host '::notice::No project yet (pre-M1); skipping build steps.' }
+
+      - name: Setup .NET 8
+        if: steps.detect.outputs.exists == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        if: steps.detect.outputs.exists == 'true'
+        run: dotnet restore src/DisplaySystemTray
+
+      - name: Build (warnings as errors)
+        if: steps.detect.outputs.exists == 'true'
+        run: dotnet build src/DisplaySystemTray -c Release --no-restore -warnaserror
+
+      - name: Test
+        if: steps.detect.outputs.exists == 'true'
+        shell: pwsh
+        run: |
+          if (Test-Path 'tests') {
+            dotnet test tests --configuration Release
+          } else {
+            Write-Host 'No test project yet; skipping.'
+          }
+
+      - name: Publish (single-file, self-contained)
+        if: steps.detect.outputs.exists == 'true' && github.ref == 'refs/heads/main'
+        run: dotnet publish src/DisplaySystemTray -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -o publish
+
+      - name: Upload artifact
+        if: steps.detect.outputs.exists == 'true' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: DisplaySystemTray-win-x64
+          path: publish/
