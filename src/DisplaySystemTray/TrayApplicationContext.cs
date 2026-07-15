@@ -8,8 +8,22 @@ namespace DisplaySystemTray;
 /// </summary>
 internal sealed class TrayApplicationContext : ApplicationContext
 {
-    private static readonly MethodInfo? ShowContextMenuMethod =
-        typeof(NotifyIcon).GetMethod("ShowContextMenu", BindingFlags.Instance | BindingFlags.NonPublic);
+    private static MethodInfo? _showContextMenuMethod = ResolveShowContextMenu();
+
+    private static MethodInfo? ResolveShowContextMenu()
+    {
+        // Reflection into WinForms internals must never be able to take the app
+        // down - resolve defensively and fall back to ContextMenuStrip.Show.
+        try
+        {
+            return typeof(NotifyIcon).GetMethod(
+                "ShowContextMenu", BindingFlags.Instance | BindingFlags.NonPublic, Type.EmptyTypes);
+        }
+        catch (Exception ex) when (ex is AmbiguousMatchException or ArgumentException)
+        {
+            return null;
+        }
+    }
 
     private readonly NotifyIcon _trayIcon;
     private readonly ContextMenuStrip _menu;
@@ -50,14 +64,21 @@ internal sealed class TrayApplicationContext : ApplicationContext
         // NotifyIcon only auto-opens ContextMenuStrip on right-click. Invoking the
         // same internal path for left-click keeps positioning and click-away
         // dismissal identical; the fallback lacks proper dismissal but still works.
-        if (ShowContextMenuMethod is not null)
+        if (_showContextMenuMethod is { } showContextMenu)
         {
-            ShowContextMenuMethod.Invoke(_trayIcon, null);
+            try
+            {
+                showContextMenu.Invoke(_trayIcon, null);
+                return;
+            }
+            catch (Exception)
+            {
+                // WinForms internals changed shape; stop using reflection this run.
+                _showContextMenuMethod = null;
+            }
         }
-        else
-        {
-            _menu.Show(Cursor.Position);
-        }
+
+        _menu.Show(Cursor.Position);
     }
 
     private void ApplyMode(DisplayMode mode)
