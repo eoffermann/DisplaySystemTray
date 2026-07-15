@@ -1,0 +1,41 @@
+namespace DisplaySystemTray;
+
+internal static class Program
+{
+    private const string SingleInstanceMutexName = "DisplaySystemTray_SingleInstance";
+
+    [STAThread]
+    private static void Main()
+    {
+        using var singleInstance = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out bool createdNew);
+        if (!createdNew)
+        {
+            MessageBox.Show(
+                "DisplaySystemTray is already running. Look for its icon in the system tray.",
+                "DisplaySystemTray",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+            return;
+        }
+
+        ApplicationConfiguration.Initialize();
+
+        // A tray app has no console; without these handlers an exception would
+        // silently kill the process and the icon would just vanish.
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.ThreadException += (_, e) => ShowFatalError(e.Exception);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => ShowFatalError(e.ExceptionObject as Exception);
+
+        using var context = new TrayApplicationContext();
+        Application.Run(context);
+    }
+
+    private static void ShowFatalError(Exception? ex)
+    {
+        MessageBox.Show(
+            $"DisplaySystemTray hit an unexpected error:\n\n{ex?.Message ?? "(unknown)"}",
+            "DisplaySystemTray",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Error);
+    }
+}
