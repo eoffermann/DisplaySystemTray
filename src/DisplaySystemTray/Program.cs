@@ -31,10 +31,17 @@ internal static class Program
         // A tray app has no console; without these handlers an exception would
         // silently kill the process and the icon would just vanish.
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-        Application.ThreadException += (_, e) => ShowFatalError(e.Exception);
-        AppDomain.CurrentDomain.UnhandledException += (_, e) => ShowFatalError(e.ExceptionObject as Exception);
+        Application.ThreadException += (_, e) => ShowUnhandledErrorDialog(e.Exception, fatal: false);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            // The CLR is tearing the process down: Main's using blocks never run,
+            // so remove the tray icon now or it ghosts until the user mouses over it.
+            _trayContext?.PrepareForFatalExit();
+            ShowUnhandledErrorDialog(e.ExceptionObject, fatal: e.IsTerminating);
+        };
 
         using var context = new TrayApplicationContext();
+        _trayContext = context;
         Application.Run(context);
 
         try
@@ -94,10 +101,30 @@ internal static class Program
         }
     }
 
-    private static void ShowFatalError(Exception? ex)
+    private static TrayApplicationContext? _trayContext;
+
+    /// <summary>
+    /// Last-resort error reporting. May run on the faulting (non-UI) thread when
+    /// the process is dying - acceptable, since there is nothing left to corrupt
+    /// and the alternative is the app disappearing with no explanation.
+    /// </summary>
+    private static void ShowUnhandledErrorDialog(object? error, bool fatal)
     {
+        string details = error switch
+        {
+            Exception ex => ex.ToString(), // full ToString: no console or log, the dialog is all we get
+            null => "(unknown error)",
+            _ => $"Non-exception object thrown: {error}",
+        };
+
+        const int maxDialogChars = 2000;
+        if (details.Length > maxDialogChars)
+        {
+            details = details[..maxDialogChars] + "…";
+        }
+
         MessageBox.Show(
-            $"DisplaySystemTray hit an unexpected error:\n\n{ex?.Message ?? "(unknown)"}",
+            $"DisplaySystemTray hit an unexpected error{(fatal ? " and must close" : string.Empty)}:\n\n{details}",
             "DisplaySystemTray",
             MessageBoxButtons.OK,
             MessageBoxIcon.Error);

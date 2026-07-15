@@ -77,6 +77,22 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _trayIcon.ShowBalloonTip(3000, "DisplaySystemTray", $"{feature} is not implemented yet.", ToolTipIcon.Info);
     }
 
+    /// <summary>
+    /// Best-effort tray icon removal when the process is about to die. May be
+    /// called from a non-UI thread; failures are irrelevant at that point.
+    /// </summary>
+    public void PrepareForFatalExit()
+    {
+        try
+        {
+            _trayIcon.Visible = false;
+        }
+        catch
+        {
+            // Process is terminating; nothing useful to do.
+        }
+    }
+
     private void ExitApplication()
     {
         _trayIcon.Visible = false;
