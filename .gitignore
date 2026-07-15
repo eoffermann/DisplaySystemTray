@@ -1,0 +1,28 @@
+# .NET / Visual Studio
+bin/
+obj/
+out/
+publish/
+*.user
+*.suo
+.vs/
+_ReSharper*/
+*.DotSettings.user
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# Build artifacts
+*.binlog
+artifacts/
+TestResults/
+
+# NuGet
+*.nupkg
+packages/
+
+# OS cruft
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
