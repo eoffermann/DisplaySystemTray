@@ -21,7 +21,7 @@ There is no test project yet; display-API behavior is verified via the hidden CL
 ## Layout
 
 - `src/DisplaySystemTray/Program.cs` — entry point, single-instance mutex, global exception handlers.
-- `src/DisplaySystemTray/Cli.cs` — hidden command-line verbs (`--current`, `--validate`, `--apply`, `--selftest`, `--list`, `--save`, `--restore`, `--delete`) for scripted verification; exit codes 0/1/2/3 documented in its usage text.
+- `src/DisplaySystemTray/Cli.cs` — hidden command-line verbs (`--current`, `--validate`, `--apply`, `--selftest`, `--list`, `--save`, `--restore`, `--delete`, `--settings`) for scripted verification; exit codes 0/1/2/3 documented in its usage text.
 - `src/DisplaySystemTray/TrayApplicationContext.cs` — tray icon + context menu; menu is rebuilt from the config store on change and reloaded on open if another process changed the file.
 - `src/DisplaySystemTray/Display/` — P/Invoke declarations (`DisplayApi.cs`), quick topology switching (`DisplayTopology.cs`), full-config snapshot/restore with adapter-LUID remapping (`DisplayConfigSnapshot.cs`).
 - `src/DisplaySystemTray/Config/` — JSON model (`AppConfig.cs`), atomic-write cross-process-locked store (`ConfigStore.cs`), HKCU Run-key autostart (`StartupRegistration.cs`).

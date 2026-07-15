@@ -55,7 +55,7 @@ internal static class Cli
 
                 default:
                     Console.Error.WriteLine("Usage: DisplaySystemTray [--current | --validate <mode> | --apply <mode> | --selftest");
-                    Console.Error.WriteLine("                         | --list | --save <name> | --restore <name> | --delete <name>]");
+                    Console.Error.WriteLine("                         | --list | --save <name> | --restore <name> | --delete <name> | --settings]");
                     Console.Error.WriteLine("Modes: extend, internal, external, clone. No arguments starts the tray app.");
                     Console.Error.WriteLine("Exit codes: 0 success, 1 operation failed or not applicable, 2 usage error, 3 unexpected error.");
                     return 2;
