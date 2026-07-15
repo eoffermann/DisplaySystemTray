@@ -15,7 +15,17 @@ internal sealed class ConfigStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static readonly TimeSpan LockTimeout = TimeSpan.FromSeconds(5);
-    private const string LockName = $@"Local\{Program.AppName}_ConfigLock";
+
+    // Per-user-SID name, like the single-instance mutex (#3): a fixed shared name
+    // would let any same-session process squat the lock.
+    private static readonly string LockName = BuildLockName();
+
+    private static string BuildLockName()
+    {
+        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        string sid = identity.User?.Value ?? identity.Name.Replace('\\', '_');
+        return $@"Local\{Program.AppName}_ConfigLock_{sid}";
+    }
 
     private readonly string _filePath;
 
@@ -43,7 +53,8 @@ internal sealed class ConfigStore
 
     public static ConfigStore Load(string filePath)
     {
-        return WithFileLock(() =>
+        // bestEffort: startup must never die on a contended/squatted lock.
+        return WithFileLock(bestEffort: true, action: () =>
         {
             if (!File.Exists(filePath))
             {
@@ -81,7 +92,7 @@ internal sealed class ConfigStore
     {
         try
         {
-            WithFileLock(() =>
+            WithFileLock(bestEffort: true, action: () =>
             {
                 if (File.Exists(_filePath))
                 {
@@ -189,23 +200,39 @@ internal sealed class ConfigStore
         }
     }
 
-    /// <summary>Serializes config-file access across the tray app and CLI processes.</summary>
-    private static T WithFileLock<T>(Func<T> action)
+    /// <summary>
+    /// Serializes config-file access across the tray app and CLI processes.
+    /// With <paramref name="bestEffort"/> (reads, startup paths) an unavailable
+    /// lock degrades to running unlocked - atomic writes keep the file itself
+    /// consistent, only lost-update protection is reduced - so a squatted or
+    /// contended lock can never turn every launch into a fatal error. Mutations
+    /// pass false and get a TimeoutException the UI/CLI surfaces instead.
+    /// </summary>
+    private static T WithFileLock<T>(Func<T> action, bool bestEffort = false)
     {
-        using var mutex = new Mutex(initiallyOwned: false, LockName);
+        Mutex? mutex = null;
         bool owned = false;
+        bool creatable = true;
         try
         {
             try
             {
-                owned = mutex.WaitOne(LockTimeout);
+                mutex = new Mutex(initiallyOwned: false, LockName);
+                try
+                {
+                    owned = mutex.WaitOne(LockTimeout);
+                }
+                catch (AbandonedMutexException)
+                {
+                    owned = true; // previous holder died; state on disk is still atomic
+                }
             }
-            catch (AbandonedMutexException)
+            catch (Exception ex) when (ex is UnauthorizedAccessException or WaitHandleCannotBeOpenedException or IOException)
             {
-                owned = true; // previous holder died; state on disk is still atomic
+                creatable = false; // squatted or wrong object type; degrade below
             }
 
-            if (!owned)
+            if (!owned && creatable && !bestEffort)
             {
                 throw new TimeoutException("Another process is holding the configuration file lock.");
             }
@@ -216,8 +243,10 @@ internal sealed class ConfigStore
         {
             if (owned)
             {
-                mutex.ReleaseMutex();
+                mutex!.ReleaseMutex();
             }
+
+            mutex?.Dispose();
         }
     }
 }
