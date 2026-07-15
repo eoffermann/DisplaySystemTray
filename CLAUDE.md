@@ -16,15 +16,16 @@ dotnet run --project src/DisplaySystemTray             # run the tray app
 dotnet publish src/DisplaySystemTray -c Release -r win-x64 --self-contained -p:PublishSingleFile=true   # ship
 ```
 
-There is no test project yet; display-API behavior is verified manually on a multi-monitor machine (see PLAN.md § Verification).
+There is no test project yet; display-API behavior is verified via the hidden CLI (run the exe with `--selftest` for a non-disruptive end-to-end check, or `--save`/`--restore`/`--delete` for the snapshot layer — output only appears when stdout is redirected, e.g. `Start-Process ... -RedirectStandardOutput`) plus manual checks on a multi-monitor machine (see PLAN.md § Verification).
 
 ## Layout
 
-- `src/DisplaySystemTray/Program.cs` — entry point, single-instance mutex.
-- `src/DisplaySystemTray/TrayApplicationContext.cs` — tray icon + context menu; menu is rebuilt from the config store on change.
-- `src/DisplaySystemTray/Display/` — P/Invoke declarations (`DisplayApi.cs`), quick topology switching (`DisplayTopology.cs`), full-config snapshot/restore (`DisplayConfigSnapshot.cs`).
-- `src/DisplaySystemTray/Config/` — JSON model + atomic-write store.
-- `src/DisplaySystemTray/UI/SettingsForm.cs` — manage saved configurations (add/rename/update-from-current/delete).
+- `src/DisplaySystemTray/Program.cs` — entry point, single-instance mutex, global exception handlers.
+- `src/DisplaySystemTray/Cli.cs` — hidden command-line verbs (`--current`, `--validate`, `--apply`, `--selftest`, `--list`, `--save`, `--restore`, `--delete`) for scripted verification; exit codes 0/1/2/3 documented in its usage text.
+- `src/DisplaySystemTray/TrayApplicationContext.cs` — tray icon + context menu; menu is rebuilt from the config store on change and reloaded on open if another process changed the file.
+- `src/DisplaySystemTray/Display/` — P/Invoke declarations (`DisplayApi.cs`), quick topology switching (`DisplayTopology.cs`), full-config snapshot/restore with adapter-LUID remapping (`DisplayConfigSnapshot.cs`).
+- `src/DisplaySystemTray/Config/` — JSON model (`AppConfig.cs`) + atomic-write store (`ConfigStore.cs`).
+- `src/DisplaySystemTray/UI/SettingsForm.cs` — manage saved configurations (add/rename/update-from-current/delete). *(lands in M4)*
 
 ## Development workflow (mandatory for all agents)
 

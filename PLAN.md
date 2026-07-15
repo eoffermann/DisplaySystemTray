@@ -44,6 +44,7 @@ A Windows system-tray utility for quickly switching display modes (Extend, Show 
 ```
 src/DisplaySystemTray/
   Program.cs               // entry point, single-instance mutex, ApplicationContext
+  Cli.cs                   // hidden CLI verbs for scripted verification (--selftest etc.)
   TrayApplicationContext.cs// NotifyIcon, menu construction, menu event handlers
   Display/
     DisplayApi.cs          // P/Invoke declarations for CCD API (structs, enums, externs)
@@ -64,15 +65,16 @@ src/DisplaySystemTray/
 
 ## Milestones
 
-1. **M0 — Scaffolding** *(this commit)*: PLAN.md, CLAUDE.md, .gitignore, git init/commit, public GitHub repo.
-2. **M1 — Project + tray shell**: install .NET 8 SDK, `dotnet new`, tray icon with static menu (quick modes wired to stub handlers), Exit works.
-3. **M2 — Quick mode switching**: CCD P/Invoke layer, Extend / Show only 1 / Show only 2 working.
-4. **M3 — Snapshot & restore**: capture current config, serialize/deserialize, apply saved config; saved items shown in tray menu.
+1. ~~**M0 — Scaffolding**~~ ✅: PLAN.md, CLAUDE.md, .gitignore, git init/commit, public GitHub repo, CI/CD, review pipeline.
+2. ~~**M1 — Project + tray shell**~~ ✅: .NET 8 SDK installed, tray icon with menu, single-instance guard, Exit works.
+3. ~~**M2 — Quick mode switching**~~ ✅: CCD P/Invoke layer, Extend / Show only 1 / Show only 2 working; hidden CLI added for scripted verification.
+4. ~~**M3 — Snapshot & restore**~~ ✅: capture current config, JSON persistence with atomic writes, apply with adapter-LUID remapping; saved items shown in tray menu.
 5. **M4 — Settings window**: CRUD UI (add/rename/update-from-current/delete), menu refresh on change.
-6. **M5 — Polish & ship**: single-instance guard, app icon, optional "Start with Windows" checkbox (HKCU Run key), README with screenshots, `dotnet publish` self-contained exe, tag v0.1.0.
+6. **M5 — Polish & ship**: app icon, optional "Start with Windows" checkbox (HKCU Run key), README with usage, `dotnet publish` self-contained exe, tag v0.1.0.
 
 ## Verification
 
+- Scripted: run the exe with `--selftest` (validates all topologies and re-applies the current one as a visual no-op) and exercise `--save`/`--restore`/`--delete` round-trips.
 - Manual: on this multi-monitor machine, exercise each quick mode, save a config, deliberately change display settings in Windows, then restore via the tray and confirm the topology returns.
 - `dotnet build` clean with warnings-as-errors for the P/Invoke layer.
 
