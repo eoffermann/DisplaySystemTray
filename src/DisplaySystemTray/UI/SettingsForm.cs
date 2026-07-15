@@ -55,7 +55,50 @@ internal sealed class SettingsForm : Form
         };
         buttons.Controls.AddRange([saveButton, _renameButton, _updateButton, _deleteButton, closeButton]);
 
+        var startupCheck = new CheckBox
+        {
+            Text = "Start with Windows",
+            AutoSize = true,
+            Location = new Point(12, 8),
+        };
+
+        var bottom = new Panel { Dock = DockStyle.Bottom, Height = 36 };
+        bottom.Controls.Add(startupCheck);
+
+        bool suppressStartupEvent = true;
+        try
+        {
+            startupCheck.Checked = StartupRegistration.IsEnabled();
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or IOException or UnauthorizedAccessException)
+        {
+            startupCheck.Enabled = false;
+            startupCheck.Text = "Start with Windows (unavailable)";
+        }
+
+        suppressStartupEvent = false;
+        startupCheck.CheckedChanged += (_, _) =>
+        {
+            if (suppressStartupEvent)
+            {
+                return;
+            }
+
+            try
+            {
+                StartupRegistration.SetEnabled(startupCheck.Checked);
+            }
+            catch (Exception ex) when (ex is System.Security.SecurityException or IOException or UnauthorizedAccessException)
+            {
+                ShowError($"Could not update the startup setting: {ex.Message}");
+                suppressStartupEvent = true;
+                startupCheck.Checked = !startupCheck.Checked;
+                suppressStartupEvent = false;
+            }
+        };
+
         Controls.Add(_list);
+        Controls.Add(bottom);
         Controls.Add(buttons);
         CancelButton = closeButton;
 
