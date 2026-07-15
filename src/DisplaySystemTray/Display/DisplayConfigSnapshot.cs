@@ -26,10 +26,13 @@ internal static class DisplayConfigSnapshot
         foreach (PathInfo path in paths)
         {
             (string friendlyName, string devicePath) = GetTargetNames(path.TargetInfo.AdapterId, path.TargetInfo.Id);
-            if (!string.IsNullOrEmpty(friendlyName))
-            {
-                saved.MonitorNames.Add(friendlyName);
-            }
+
+            // MonitorNames must stay index-aligned with Paths (BuildLuidRemap and
+            // error messages rely on it), so always add exactly one name per path.
+            saved.MonitorNames.Add(
+                !string.IsNullOrEmpty(friendlyName) ? friendlyName
+                : !string.IsNullOrEmpty(devicePath) ? devicePath
+                : $"Display {saved.Paths.Count + 1}");
 
             saved.Paths.Add(ToDto(path, devicePath));
         }
