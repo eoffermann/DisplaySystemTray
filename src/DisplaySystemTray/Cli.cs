@@ -20,12 +20,12 @@ internal static class Cli
                     Console.WriteLine($"Current topology: {DisplayTopology.GetCurrent()?.ToString() ?? "(none/custom)"}");
                     return 0;
 
-                case "--validate" when args.Length > 1 && Enum.TryParse(args[1], ignoreCase: true, out DisplayMode mode):
+                case "--validate" when args.Length > 1 && Enum.TryParse(args[1], ignoreCase: true, out DisplayMode mode) && Enum.IsDefined(mode):
                     bool ok = DisplayTopology.Validate(mode);
                     Console.WriteLine($"Validate {mode}: {(ok ? "OK" : "not applicable")}");
                     return ok ? 0 : 1;
 
-                case "--apply" when args.Length > 1 && Enum.TryParse(args[1], ignoreCase: true, out DisplayMode applyMode):
+                case "--apply" when args.Length > 1 && Enum.TryParse(args[1], ignoreCase: true, out DisplayMode applyMode) && Enum.IsDefined(applyMode):
                     Console.WriteLine($"Applying {applyMode}...");
                     DisplayTopology.Apply(applyMode);
                     Console.WriteLine($"Applied {applyMode}.");
@@ -47,15 +47,16 @@ internal static class Cli
                     return Delete(args[1]);
 
                 default:
-                    Console.WriteLine("Usage: DisplaySystemTray [--current | --validate <mode> | --apply <mode> | --selftest");
-                    Console.WriteLine("                         | --list | --save <name> | --restore <name> | --delete <name>]");
-                    Console.WriteLine("Modes: extend, internal, external, clone. No arguments starts the tray app.");
+                    Console.Error.WriteLine("Usage: DisplaySystemTray [--current | --validate <mode> | --apply <mode> | --selftest");
+                    Console.Error.WriteLine("                         | --list | --save <name> | --restore <name> | --delete <name>]");
+                    Console.Error.WriteLine("Modes: extend, internal, external, clone. No arguments starts the tray app.");
+                    Console.Error.WriteLine("Exit codes: 0 success, 1 operation failed or not applicable, 2 usage error, 3 unexpected error.");
                     return 2;
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"ERROR: {ex.Message}");
+            Console.Error.WriteLine($"ERROR: {ex.Message}");
             return 3;
         }
     }
@@ -92,7 +93,7 @@ internal static class Cli
         SavedConfiguration? saved = FindByName(store, name);
         if (saved is null)
         {
-            Console.WriteLine($"No saved configuration named \"{name}\".");
+            Console.Error.WriteLine($"No saved configuration named \"{name}\".");
             return 1;
         }
 
@@ -108,7 +109,7 @@ internal static class Cli
         SavedConfiguration? saved = FindByName(store, name);
         if (saved is null)
         {
-            Console.WriteLine($"No saved configuration named \"{name}\".");
+            Console.Error.WriteLine($"No saved configuration named \"{name}\".");
             return 1;
         }
 
