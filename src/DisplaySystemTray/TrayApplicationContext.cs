@@ -48,7 +48,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         _trayIcon = new NotifyIcon
         {
-            Icon = SystemIcons.Application, // placeholder until the custom icon lands in M5
+            Icon = LoadTrayIcon(),
             Text = Program.AppName,
             ContextMenuStrip = _menu,
             Visible = true,
@@ -59,6 +59,27 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             _trayIcon.ShowBalloonTip(0, Program.AppName, warning, ToolTipIcon.Warning);
         }
+    }
+
+    private static Icon LoadTrayIcon()
+    {
+        // The .ico is embedded so the single-file exe needs no loose resources.
+        // Icon(Stream, Size) picks the best-matching image for the tray's DPI.
+        try
+        {
+            using Stream? stream = typeof(TrayApplicationContext).Assembly
+                .GetManifestResourceStream("DisplaySystemTray.Resources.app.ico");
+            if (stream is not null)
+            {
+                return new Icon(stream, SystemInformation.SmallIconSize);
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException)
+        {
+            // Malformed/missing resource; fall through to the stock icon.
+        }
+
+        return SystemIcons.Application;
     }
 
     private void RebuildMenu()
