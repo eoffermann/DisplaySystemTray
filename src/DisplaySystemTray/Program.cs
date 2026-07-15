@@ -4,6 +4,7 @@ namespace DisplaySystemTray;
 
 internal static class Program
 {
+    internal const string AppName = "DisplaySystemTray";
 
     [STAThread]
     private static int Main(string[] args)
@@ -21,8 +22,8 @@ internal static class Program
         if (singleInstance is null)
         {
             MessageBox.Show(
-                "DisplaySystemTray is already running. Look for its icon in the system tray.",
-                "DisplaySystemTray",
+                $"{AppName} is already running. Look for its icon in the system tray.",
+                AppName,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
             return 0;
@@ -74,7 +75,7 @@ internal static class Program
         Mutex? mutex = null;
         try
         {
-            mutex = new Mutex(initiallyOwned: false, $@"Local\DisplaySystemTray_{userSid}");
+            mutex = new Mutex(initiallyOwned: false, $@"Local\{AppName}_{userSid}");
 
             // A short wait (instead of a createdNew snapshot) closes the race where
             // a quick exit-and-relaunch sees the dying previous instance and quits,
@@ -124,8 +125,8 @@ internal static class Program
         }
 
         MessageBox.Show(
-            $"DisplaySystemTray hit an unexpected error{(fatal ? " and must close" : string.Empty)}:\n\n{details}",
-            "DisplaySystemTray",
+            $"{AppName} hit an unexpected error{(fatal ? " and must close" : string.Empty)}:\n\n{details}",
+            AppName,
             MessageBoxButtons.OK,
             MessageBoxIcon.Error);
     }

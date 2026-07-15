@@ -34,7 +34,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _trayIcon = new NotifyIcon
         {
             Icon = SystemIcons.Application, // placeholder until the custom icon lands in M5
-            Text = "DisplaySystemTray",
+            Text = Program.AppName,
             ContextMenuStrip = _menu,
             Visible = true,
         };
@@ -89,13 +89,14 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
         catch (Exception ex)
         {
-            _trayIcon.ShowBalloonTip(5000, "DisplaySystemTray", $"Could not switch displays: {ex.Message}", ToolTipIcon.Error);
+            // First arg (timeout) has been ignored by Windows since Vista; pass 0.
+            _trayIcon.ShowBalloonTip(0, Program.AppName, $"Could not switch displays: {ex.Message}", ToolTipIcon.Error);
         }
     }
 
     private void NotYetImplemented(string feature)
     {
-        _trayIcon.ShowBalloonTip(3000, "DisplaySystemTray", $"{feature} is not implemented yet.", ToolTipIcon.Info);
+        _trayIcon.ShowBalloonTip(0, Program.AppName, $"{feature} is not implemented yet.", ToolTipIcon.Info);
     }
 
     /// <summary>
